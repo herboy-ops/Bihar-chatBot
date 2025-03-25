@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electricity Department Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #1a1a1a; color: white; text-align: center; }
+        #chatbot-container { width: 400px; height: 550px; background: #2c2c2c; border-radius: 10px; box-shadow: 0px 0px 15px rgba(0, 255, 255, 0.4); position: fixed; bottom: 80px; right: 20px; display: none; }
+        #chatbox { flex-grow: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; height: 80%; }
+        .chat-message { display: flex; align-items: center; margin: 8px 0; }
+        .user { justify-content: flex-end; }
+        .bot { justify-content: flex-start; }
+        .chat-bubble { padding: 10px 15px; border-radius: 12px; max-width: 75%; word-wrap: break-word; }
+        .user .chat-bubble { background: #007bff; color: white; }
+        .bot .chat-bubble { background: #444; color: white; }
+        #chat-input-container { display: flex; padding: 10px; background: #333; }
+        #chat-input { flex-grow: 1; padding: 10px; border: none; background: #444; color: white; }
+        #send-btn { background: #007bff; color: white; padding: 10px; margin-left: 10px; cursor: pointer; border-radius: 5px; }
+        #robot-icon { position: fixed; bottom: 20px; right: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <img id="robot-icon" 
+     src="https://cdn-icons-png.flaticon.com/512/4712/4712019.png" 
+     width="80" 
+     alt="Chatbot Icon" 
+     onclick="toggleChat()" 
+     style="position: fixed; bottom: 20px; right: 20px; cursor: pointer; transition: transform 0.3s ease-in-out;"
+     onmouseover="this.style.transform='scale(1.1)'" 
+     onmouseout="this.style.transform='scale(1)'">
+
+    <div id="chatbot-container">
+        <div id="chatbox"></div>
+        <div id="chat-input-container">
+            <input type="text" id="chat-input" placeholder="Enter Consumer Number or Office Name..." onkeypress="handleKeyPress(event)">
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        function toggleChat() {
+            let chatContainer = document.getElementById('chatbot-container');
+            chatContainer.style.display = chatContainer.style.display === 'block' ? 'none' : 'block';
+        }
+
+        async function sendMessage() {
+            let inputText = document.getElementById('chat-input').value.trim();
+            if (!inputText) return;
+
+            appendMessage('user', inputText);
+            document.getElementById('chat-input').value = '';
+
+            if (
+    inputText.toLowerCase().includes("how many consumers in") || 
+    inputText.toLowerCase().includes("kitne consumer hai office")
+) {
+    let officeName = inputText.split("in")[1]?.trim() || 
+                     inputText.split("office")[1]?.replace("me", "").trim();
+    
+    if (officeName) {
+        appendMessage('bot', `Fetching consumer count for ${officeName}...`);
+        await getOfficeConsumerCount(officeName);
+    } else {
+        appendMessage('bot', "Please specify an office name.");
+    }
+
+
+            } else {
+                appendMessage('bot', "Fetching consumer details...");
+                await getConsumerDetails(inputText);
+            }
+        }
+
+        async function getConsumerDetails(consumerNumber) {
+            try {
+                let response = await fetch('http://127.0.0.1:8000/get_consumer_details/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ consumer_number: consumerNumber })
+                });
+                let data = await response.json();
+                if (response.ok) {
+                    appendMessage('bot', `🏠 Name: ${data['Consumer Name']}<br>💰 Total Bill: ₹${data['Total Bill']}<br>🔌 Status: ${data['Consumer Status']}`);
+                } else {
+                    appendMessage('bot', 'Consumer not found.');
+                }
+            } catch (error) {
+                appendMessage('bot', 'Error fetching details.');
+            }
+        }
+
+        async function getOfficeConsumerCount(officeName) {
+            try {
+                let response = await fetch(`http://127.0.0.1:8000/get_office_consumer_count/?office_name=${officeName}`);
+                let data = await response.json();
+                appendMessage('bot', `📌 Office: ${data.OFFICE_NAME}<br>👥 Consumers: ${data.CONSUMER_COUNT}<br>🔌 Status: ${data.CONSUMER_STATUS}`);
+            } catch (error) {
+                appendMessage('bot', 'Office not found.');
+            }
+        }
+
+        function appendMessage(sender, message) {
+            let chatContainer = document.getElementById('chatbox');
+            let messageDiv = document.createElement('div');
+            messageDiv.classList.add('chat-message', sender);
+            let messageText = document.createElement('div');
+            messageText.classList.add('chat-bubble');
+            messageText.innerHTML = message;
+            messageDiv.appendChild(messageText);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
